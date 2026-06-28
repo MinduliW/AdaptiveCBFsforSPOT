@@ -47,7 +47,7 @@ exactly like trmpc's `fcn.m`. `spot_rl_fcn.m` is that block body.
      if your QP wants it flat)
 4. Set the model to **Normal** simulation mode (NOT Accelerator / Rapid Accelerator / codegen
    — `py.*` only runs in the interpreter, same limit as trmpc's Python project).
-5. Run. The **first** step is slow (torch import + model load); every step after is fast.
+5. Run. The **first** step is slightly slow (load `spot_policy.mat`); every step after is fast.
 
 **Easiest path:** clone the existing `Python_TRMPC` block that runs `fcn.m`, swap
 `fcn` → `spot_rl_fcn`, add the two extra inputs (`x_obstacle`, `holding_radius`), and route the
@@ -81,7 +81,8 @@ Then in MATLAB, after the `pyenv`/`insert` lines:
 should give `s = 1`, `k ≈ 4.743`, and the same `g`.
 
 ## Notes
-- First call is slow (imports torch + loads the model); subsequent calls are fast — the
+- The bridge is **numpy-only** (no torch/SB3): the MLP forward pass is plain matrix math
+  from `spot_policy.mat`. First call loads the .mat; subsequent calls are fast — the
   module caches model/normalizer/env in globals (the `persistent` on the MATLAB side caches
   the imported module handle).
 - States are **lab frame** `[x y theta dx dy dtheta]`, same convention as `TEST_CASES`.

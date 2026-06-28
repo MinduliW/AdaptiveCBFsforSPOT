@@ -1,61 +1,69 @@
-# Deploying the RL gain policy to the Windows SPOT testbed
+# Deploying the RL gain policy to the Windows SPOT testbed (numpy-only)
 
-End-to-end: clone the repo → build the Python env → point MATLAB at it → wire the RL
-gain policy into the SPOT Simulink model. Same `pyenv` mechanism as `Python_TRMPC`,
-but Python returns the **class-K gains** (your CBF-CLF QP stays in MATLAB).
+The policy is a trained MLP, and **running** a trained network is just matrix math —
+no PyTorch needed. `spot_rl_policy.py` evaluates it with **numpy only** (weights live in
+`spot_policy.mat`), proven identical to the torch version to ~1e-7. So the Python side is
+just `pip install numpy scipy` — no conda, no torch, none of the DLL grief.
 
 ## 1. Get the code (on Windows)
 ```
 git clone https://github.com/MinduliW/AdaptiveCBFsforSPOT.git
 ```
-Note the full path, e.g. `C:\Users\<you>\AdaptiveCBFsforSPOT`.
+Note the path, e.g. `C:\Users\<you>\AdaptiveCBFsforSPOT`.
 
-## 2. Build the Python environment (Miniconda)
+## 2. Python environment — trivial (numpy + scipy)
+Use a plain **python.org** Python 3.x (NOT conda — that's what caused the `pyexpat`/DLL
+errors). Install it (tick "Add to PATH"), then:
 ```
-conda create -n spot-rl python=3.11
-conda activate spot-rl
-pip install -r SPOT_pyenv_bridge\requirements.txt
-where python        ::  -> C:\Users\<you>\miniconda3\envs\spot-rl\python.exe   (note this)
+python -m venv C:\spot-rl-venv
+C:\spot-rl-venv\Scripts\activate
+pip install -r C:\Users\<you>\AdaptiveCBFsforSPOT\SPOT_pyenv_bridge\requirements.txt
+where python        ::  -> C:\spot-rl-venv\Scripts\python.exe   (note this)
 ```
+(`requirements.txt` is just `numpy` + `scipy`.)
 
-## 3. Verify the policy runs standalone (no MATLAB yet)
+## 3. Verify the policy runs standalone
 ```
+cd C:\Users\<you>\AdaptiveCBFsforSPOT
 python spot_rl_policy.py
 ```
-Should print `k_dock` and the 3×3 gains. If this works, the Python side is correct.
+Prints `k_dock` and the 3×3 gains → Python side is good.
 
-## 4. Point MATLAB at the env — add to `Run_Initializer.m`
+## 4. Point MATLAB at it — add to `Run_Initializer.m`
 ```matlab
-pyenv(Version="C:\Users\<you>\miniconda3\envs\spot-rl\python.exe");
-insert(py.sys.path, int32(0), "C:\Users\<you>\AdaptiveCBFsforSPOT");
+addpath("C:\Users\<you>\AdaptiveCBFsforSPOT\SPOT_pyenv_bridge");        % MATLAB finds the .m wrappers
+pyenv(Version="C:\spot-rl-venv\Scripts\python.exe", ExecutionMode="OutOfProcess");
+insert(py.sys.path, int32(0), "C:\Users\<you>\AdaptiveCBFsforSPOT");    % Python finds spot_rl_policy.py
 ```
-(Use double backslashes `\\` or forward slashes in MATLAB strings.) Verify in MATLAB:
+Test in MATLAB:
 ```matlab
-[g,k,s] = call_python_policy([1.5 2 pi 0 0 0], [2.2 0.2 4.712 0 0 0], [2 1.2 0 0 0 0], [0.85 0.85])
-% -> s = 1, k ~ 4.743, g is 3x3
+[g,k,s] = call_python_policy([1.5 2 pi 0 0 0],[2.2 0.2 4.712 0 0 0],[2 1.2 0 0 0 0],[0.85 0.85])
+% -> s = 1, k ~ 4.743, g 3x3
 ```
 
 ## 5. Wire into the SPOT Simulink model
-Copy `SPOT_pyenv_bridge\call_python_policy.m` and `spot_rl_fcn.m` into your SPOT project
-folder (next to where `Python_TRMPC` keeps `fcn.m` / `call_python_mpc.m`). Then:
-- Add a **MATLAB Function block** and paste `spot_rl_fcn.m`.
-- **in:**  `x_red`(6), `x_black`(6), `x_obstacle`(6), `holding_radius`(2) — from the
-  PhaseSpace/estimator (the same signals that feed your controller; `x_obstacle` is the
-  BLUE platform, or a fixed far pose if there's no physical obstacle).
-- **out:** `g`(3×3), `k_dock`(1) — into the CBF-CLF QP block, replacing the gains it
-  currently has fixed.
+Add a **MATLAB Function block** with the body from `SPOT_pyenv_bridge\spot_rl_fcn.m`:
+- **in:**  `x_red`(6), `x_black`(6), `x_obstacle`(6), `holding_radius`(2) — from PhaseSpace/estimator
+- **out:** `g`(3×3), `k_dock`(1) — into your CBF-CLF QP, replacing its fixed gains
 - Set the model to **Normal** simulation mode (Python co-execution can't be code-generated).
 
 ## 6. Run
-First step lags (~seconds: torch import + model load), then it runs at rate. On any Python
-error the wrapper returns `status_code = -99` and the **nominal gains (1, 0.5, 0.25)** as a
-safe fallback.
+First step lags ~1 s (load `spot_policy.mat`), then it runs at rate. On any Python error the
+wrapper returns `status_code = -99` and nominal gains `(1, 0.5, 0.25)` as a safe fallback.
 
 ## Troubleshooting
-- `pyenv` must be set **before** the first `py.*` call and can't change mid-session — restart
-  MATLAB if you change it.
-- `ModuleNotFoundError: spot_rl_policy` → the `insert(py.sys.path, …)` path is wrong/missing.
-- `ModuleNotFoundError: torch`/`stable_baselines3` → `pyenv(Version=…)` points at the wrong env.
-- Slow to install / large env → the heavy dep is **torch (≈345 MB)**. A **numpy-only** bridge
-  (drops torch + SB3, leaving `pip install numpy scipy`) is available on request — same
-  `get_gains` interface, so the MATLAB side is unchanged.
+- **Use python.org Python, not conda** — the `pyexpat`/`DLL load failed` errors come from
+  conda's DLL layout fighting MATLAB. A plain python.org venv with numpy+scipy avoids it.
+- `ExecutionMode="OutOfProcess"` runs Python in a separate process (extra robustness vs DLL
+  clashes); it can't be changed mid-session, so restart MATLAB if you tweak the `pyenv` line.
+- `Unrecognized function 'call_python_policy'` → the `addpath(...\SPOT_pyenv_bridge)` is missing.
+- `ModuleNotFoundError: spot_rl_policy` → the `insert(py.sys.path,…)` path is wrong.
+- `FileNotFoundError: spot_policy.mat` → run from / point at the repo root (the weights file is there).
+
+## Updating the policy after retraining
+Re-export the weights and regenerate the numpy module:
+```
+python export_for_simulink.py <model_dir>   # -> spot_policy.mat
+python make_slim.py                          # -> spot_rl_policy.py (numpy-only)
+```
+Commit `spot_policy.mat` + `spot_rl_policy.py`, pull on Windows. The MATLAB side is unchanged.

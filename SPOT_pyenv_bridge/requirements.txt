@@ -1,11 +1,5 @@
-# Python 3.11 interpreter for the SPOT RL gain policy (point MATLAB pyenv at it).
-# Recreate on the target:  conda create -n spot-rl python=3.11 && pip install -r requirements.txt
-numpy==2.1.3
-scipy==1.15.2
-torch==2.6.0
-stable-baselines3==2.7.0
-sb3-contrib==2.6.0
-gymnasium==0.29.1
-qpsolvers==4.12.0
-quadprog            # qpsolvers backend (only needed if the QP is run in Python)
-cloudpickle==3.1.2
+# Numpy-only inference of the trained MLP -- NO torch / SB3 / conda needed.
+# The network forward pass is plain matrix math; weights live in spot_policy.mat.
+# Works on a plain python.org install (sidesteps the conda DLL issues).
+numpy
+scipy
