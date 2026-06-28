@@ -25,7 +25,14 @@ _D = None
 def _load():
     global _D
     if _D is None:
-        _D = _sio.loadmat(_MAT)
+        m = _sio.loadmat(_MAT)
+        def s(k):                                    # .mat scalar -> python float (any (1,1)/(1,) shape)
+            return float(np.ravel(m[k])[0])
+        _D = dict(W1=m["W1"], b1=m["b1"], W2=m["W2"], b2=m["b2"], W3=m["W3"], b3=m["b3"],
+                  obs_mean=m["obs_mean"], obs_std=m["obs_std"],
+                  BASE=np.ravel(m["BASE"]), BAND=np.ravel(m["BAND"]),
+                  clip_obs=s("clip_obs"), ACOEF_HI=s("ACOEF_HI"), HSLACK_LO=s("HSLACK_LO"),
+                  HSLACK_HI=s("HSLACK_HI"), KDOCK=s("KDOCK"), KBAND=s("KBAND"))
     return _D
 
 
@@ -50,28 +57,27 @@ def get_gains(x_red, x_black, x_obstacle, holding_radius=None):
     """states -> RL class-K gains (3x3) + k_dock.  numpy only; same interface as the
     torch bridge so call_python_policy.m / the Simulink block are unchanged."""
     D = _load()
-    xR = np.asarray(x_red, float).ravel()[:6]
-    xB = np.asarray(x_black, float).ravel()[:6]
-    xU = np.asarray(x_obstacle, float).ravel()[:6]
+    xR = np.asarray(x_red, dtype=np.float64).reshape(-1)[:6]      # robust to MATLAB row/col/2-D
+    xB = np.asarray(x_black, dtype=np.float64).reshape(-1)[:6]
+    xU = np.asarray(x_obstacle, dtype=np.float64).reshape(-1)[:6]
     if holding_radius is not None:
-        hr = np.asarray(holding_radius, float).ravel()
+        hr = np.asarray(holding_radius, dtype=np.float64).reshape(-1)
         rkoz = hr[:2] if hr.size >= 2 else np.array([hr[0], hr[0]])
     else:
         rkoz = R_KOZ_TAR_INI
 
     obs = _build_obs(xR, xB, xU, rkoz).reshape(-1, 1)
-    on = np.clip((obs - D["obs_mean"]) / D["obs_std"], -float(D["clip_obs"]), float(D["clip_obs"]))
+    on = np.clip((obs - D["obs_mean"]) / D["obs_std"], -D["clip_obs"], D["clip_obs"])
     h = np.tanh(D["W1"] @ on + D["b1"])
     h = np.tanh(D["W2"] @ h + D["b2"])
-    a = np.clip((D["W3"] @ h + D["b3"]).ravel(), -1, 1)
+    a = np.clip((D["W3"] @ h + D["b3"]).reshape(-1), -1.0, 1.0)
 
     grid = a[0:9].reshape(3, 3)
-    BASE = D["BASE"].ravel(); BAND = D["BAND"].ravel()
-    g = BASE[None, :] + BAND[None, :] * grid
-    g[:, 0:2] = np.clip(g[:, 0:2], 0.0, float(D["ACOEF_HI"]))
-    g[:, 2] = np.clip(g[:, 2], float(D["HSLACK_LO"]), float(D["HSLACK_HI"]))
-    k_dock = float(max(0.1, float(D["KDOCK"]) + float(D["KBAND"]) * a[9]))
-    return dict(gains=np.asarray(g, float), k_dock=k_dock, success=True)
+    g = D["BASE"][None, :] + D["BAND"][None, :] * grid
+    g[:, 0:2] = np.clip(g[:, 0:2], 0.0, D["ACOEF_HI"])
+    g[:, 2] = np.clip(g[:, 2], D["HSLACK_LO"], D["HSLACK_HI"])
+    k_dock = float(max(0.1, D["KDOCK"] + D["KBAND"] * float(a[9])))
+    return dict(gains=np.asarray(g, dtype=np.float64), k_dock=k_dock, success=True)
 
 
 if __name__ == "__main__":
