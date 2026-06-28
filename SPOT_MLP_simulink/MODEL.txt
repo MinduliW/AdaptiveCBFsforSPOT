@@ -1,0 +1,1 @@
+model used: TrainedModels/PPO_adaptive_l2_n128_lr0.0003D_std0.2_ne10_g0.9997_ent0.01_scratch_rand_anneal_resid_prop_tof (best=2582.2692)

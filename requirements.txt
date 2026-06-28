@@ -1,0 +1,12 @@
+# Core CBF / env / optimization
+numpy
+scipy
+sympy                 # symbolic ICCBF derivation (cbf_rvd.py)
+gymnasium             # RL env API (spot_env.py)
+qpsolvers[quadprog]   # CLF-CBF-QP solver (spot_env.py uses solver='quadprog')
+matplotlib            # trajectory plots / animations
+
+# RL training (train_ppo.py, tune_gains_rl.py)
+stable-baselines3
+sb3-contrib           # RecurrentPPO (train_ppo.py --rnn)
+# torch is pulled in by stable-baselines3

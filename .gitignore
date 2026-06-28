@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+
+# Generated artifacts (regenerate locally; not needed to run the policy)
+videos/
+*.mp4
+
+# NOTE: TrainedModels/ and BestModels/ ARE committed on purpose -- the pyenv
+# bridge and the Simulink export load the policy weights from there.

@@ -1,0 +1,8 @@
+# DE-optimized per-case gains (target the RL bandit should approach)
+# columns: tar(a0,a1,a2) | obs(a0,a1,a2) | los(a0,a1,a2) | k_dock | score docked t_dock fuel
+case 0: tar=[1.221, 0.843, 0.045] obs=[1.622, 2.097, 0.297] los=[1.502, 1.471, 0.078] k_dock=1.93 | score=949.5 docked=True t_dock=128.4s fuel=1.90
+case 1: tar=[2.712, 2.614, 0.278] obs=[2.021, 1.882, 0.793] los=[1.951, 0.093, 0.046] k_dock=2.94 | score=941.2 docked=True t_dock=66.7s fuel=2.22
+case 2: tar=[2.22, 2.943, 0.14] obs=[0.153, 0.536, 0.071] los=[1.365, 0.441, 0.118] k_dock=3.41 | score=921.6 docked=True t_dock=80.2s fuel=3.01
+case 3: tar=[1.723, 1.007, 0.178] obs=[0.023, 2.476, 0.213] los=[0.5, 1.276, 0.492] k_dock=1.71 | score=930.9 docked=True t_dock=110.6s fuel=2.64
+case 4: tar=[0.757, 2.083, 0.049] obs=[0.227, 2.05, 0.209] los=[0.135, 2.886, 0.275] k_dock=3.86 | score=944.7 docked=True t_dock=119.9s fuel=2.06
+SUM_SCORE = 4687.9  (target; docked 5/5)
